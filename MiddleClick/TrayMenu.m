@@ -1,4 +1,5 @@
 #import "TrayMenu.h"
+#import "PreferenceKeys.h"
 #import "Controller.h"
 #import <Cocoa/Cocoa.h>
 
@@ -12,34 +13,72 @@
   return self;
 }
 
+- (void)initAccessibilityPermissionStatus:(NSMenu*)menu
+{
+  BOOL hasAccessibilityPermission = AXIsProcessTrusted();
+
+  [self updateAccessibilityPermissionStatus:menu
+                 hasAccessibilityPermission:hasAccessibilityPermission];
+
+  if (!hasAccessibilityPermission) {
+    [NSTimer scheduledTimerWithTimeInterval:0.3 repeats:NO block:^(NSTimer* timer) {
+      [self initAccessibilityPermissionStatus:menu];
+    }];
+  }
+}
+- (void)updateAccessibilityPermissionStatus:(NSMenu*)menu
+                 hasAccessibilityPermission:(BOOL)isTrusted
+{
+  _statusItem.button.appearsDisabled = !isTrusted;
+  accessibilityPermissionStatusItem.hidden = isTrusted;
+  accessibilityPermissionActionItem.hidden = isTrusted;
+}
+
 - (void)openWebsite:(id)sender
 {
   NSURL* url = [NSURL
-                URLWithString:@"https://github.com/artginzburg/MiddleClick-BigSur"];
+                URLWithString:@"https://github.com/artginzburg/MiddleClick-Sonoma"];
   [[NSWorkspace sharedWorkspace] openURL:url];
 }
-
-- (void)setClick:(id)sender
+- (void)openAccessibilitySettings:(id)sender
 {
-  [myController setMode:YES];
+  BOOL isPreCatalina = (floor(NSAppKitVersionNumber) < NSAppKitVersionNumber10_15);
+  if (isPreCatalina) {
+    NSAppleScript *a = [[NSAppleScript alloc] initWithSource:
+                        @"tell application \"System Preferences\"\n"
+                        "activate\n"
+                        "reveal anchor \"Privacy_Accessibility\" of pane \"com.apple.preference.security\"\n"
+                        "end tell"];
+    [a executeAndReturnError:nil];
+    [a release];
+  } else {
+    NSURL* url = [NSURL
+                  URLWithString:@"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"];
+    [[NSWorkspace sharedWorkspace] openURL:url];
+  }
+}
+
+- (void)toggleTapToClick:(id)sender
+{
+  [myController setMode:[sender state] == NSControlStateValueOn];
   [self setChecks];
 }
 
-- (void)setTap:(id)sender
+- (void)resetTapToClick:(id)sender
 {
-  [myController setMode:NO];
+  [myController resetClickMode];
   [self setChecks];
 }
 
 - (void)setChecks
 {
-  if ([myController getClickMode]) {
-    [clickItem setState:NSControlStateValueOn];
-    [tapItem setState:NSControlStateValueOff];
-  } else {
-    [clickItem setState:NSControlStateValueOff];
-    [tapItem setState:NSControlStateValueOn];
-  }
+  bool clickMode = [myController getClickMode];
+  NSString* clickModeInfo = clickMode ? @"Click" : @"Click or Tap";
+  
+  int fingersQua = (int)[[NSUserDefaults standardUserDefaults] integerForKey:kFingersNum];
+  
+  [infoItem setTitle:[clickModeInfo stringByAppendingFormat: @" with %d Fingers", fingersQua]];
+  [tapToClickItem setState:clickMode ? NSControlStateValueOff : NSControlStateValueOn];
 }
 
 - (void)actionQuit:(id)sender
@@ -54,25 +93,32 @@
   
   
   
-  int fingersQua = (int)[[NSUserDefaults standardUserDefaults] integerForKey:@"fingers"];
+  [self createMenuAccessibilityPermissionItems:menu];
   
   // Add About
-  menuItem = [menu addItemWithTitle:@"About MiddleClick..."
+  menuItem = [menu addItemWithTitle:[NSString stringWithFormat:@"About %@...", getAppName()]
                              action:@selector(openWebsite:)
                       keyEquivalent:@""];
   [menuItem setTarget:self];
   
   [menu addItem:[NSMenuItem separatorItem]];
   
-  clickItem = [menu addItemWithTitle:[NSString stringWithFormat: @"%d Finger Click", fingersQua]
-                              action:@selector(setClick:)
-                       keyEquivalent:@""];
-  [clickItem setTarget:self];
+  infoItem = [menu addItemWithTitle:@""
+                             action:nil
+                      keyEquivalent:@""];
+  [infoItem setTarget:self];
   
-  tapItem = [menu addItemWithTitle:[NSString stringWithFormat: @"%d Finger Tap", fingersQua]
-                            action:@selector(setTap:)
-                     keyEquivalent:@""];
-  [tapItem setTarget:self];
+  tapToClickItem = [menu addItemWithTitle:@"Tap to click"
+                                   action:@selector(toggleTapToClick:)
+                            keyEquivalent:@""];
+  [tapToClickItem setTarget:self];
+  
+  NSMenuItem* resetItem = [menu addItemWithTitle:@"Reset to System Settings"
+                                          action:@selector(resetTapToClick:)
+                                   keyEquivalent:@""];
+  resetItem.alternate = YES;
+  resetItem.keyEquivalentModifierMask = NSEventModifierFlagOption;
+  [resetItem setTarget:self];
   
   [self setChecks];
   
@@ -86,6 +132,14 @@
   [menuItem setTarget:self];
   
   return menu;
+}
+
+- (void)createMenuAccessibilityPermissionItems:(NSMenu *)menu
+{
+  accessibilityPermissionStatusItem = [menu addItemWithTitle:@"Missing Accessibility permission" action:nil keyEquivalent:@""];
+  accessibilityPermissionActionItem = [menu addItemWithTitle:@"Open Privacy Preferences" action:@selector(openAccessibilitySettings:) keyEquivalent:@","];
+
+  [menu addItem:[NSMenuItem separatorItem]];
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification*)notification
@@ -108,8 +162,10 @@
                   statusItemWithLength:24] retain];
   _statusItem.behavior = NSStatusItemBehaviorRemovalAllowed;
   _statusItem.menu = menu;
-  _statusItem.button.toolTip = @"MiddleClick";
+  _statusItem.button.toolTip = getAppName();
   _statusItem.button.image = icon;
+
+  [self initAccessibilityPermissionStatus:menu];
   
   [menu release];
 }
@@ -119,6 +175,10 @@
 {
   _statusItem.visible = true;
   return 1;
+}
+
+NSString* getAppName(void) {
+    return [[NSProcessInfo processInfo] processName];
 }
 
 @end

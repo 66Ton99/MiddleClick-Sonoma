@@ -5,11 +5,13 @@
 @private
   NSStatusItem* _statusItem;
   Controller* myController;
-  NSMenuItem* tapItem;
-  NSMenuItem* clickItem;
+  NSMenuItem* accessibilityPermissionStatusItem;
+  NSMenuItem* accessibilityPermissionActionItem;
+  NSMenuItem* infoItem;
+  NSMenuItem* tapToClickItem;
 }
 - (id)initWithController:(Controller*)ctrl;
 - (void)setChecks;
-- (void)setClick:(id)sender;
-- (void)setTap:(id)sender;
+- (void)toggleTapToClick:(id)sender;
+- (void)resetTapToClick:(id)sender;
 @end
