@@ -276,7 +276,7 @@ int touchCallback(int device, Finger* data, int nFingers, double timestamp,
   float maxTimeDelta = [[NSUserDefaults standardUserDefaults] integerForKey:kMaxTimeDeltaMs] / 1000.f;
   
   if (needToClick) {
-    threeDown = nFingers == fingersQua;
+    threeDown = nFingers >= fingersQua;
   } else {
     if (nFingers == 0) {
       NSTimeInterval elapsedTime = touchStartTime ? -[touchStartTime timeIntervalSinceNow] : 0;
