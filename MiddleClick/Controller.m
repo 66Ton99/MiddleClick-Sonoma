@@ -87,7 +87,7 @@ BOOL wasThreeDown;
    object:NULL];
   
   // Register IOService notifications for added devices.
-  IONotificationPortRef port = IONotificationPortCreate(kIOMasterPortDefault);
+  IONotificationPortRef port = IONotificationPortCreate(kIOMainPortDefault);
   CFRunLoopAddSource(CFRunLoopGetMain(),
                      IONotificationPortGetRunLoopSource(port),
                      kCFRunLoopDefaultMode);
@@ -215,7 +215,7 @@ int touchCallback(int device, Finger* data, int nFingers, double timestamp,
       }
     }
     
-    if (nFingers != fingersQua) {
+    if (nFingers < fingersQua) {
       if (threeDown) {
         threeDown = NO;
       }
@@ -285,7 +285,7 @@ int touchCallback(int device, Finger* data, int nFingers, double timestamp,
 }
 
 /// Relaunch the app when devices are connected/invalidated.
-static void restartApp()
+static void restartApp(void)
 {
   NSTask *task = [[[NSTask alloc] init] autorelease];
   NSMutableArray *args = [NSMutableArray array];
